@@ -1,44 +1,67 @@
-name: Build Maga v Gorode APK
+name: Build 444 APK
+
 on:
   workflow_dispatch:
   push:
     branches: [main, master]
+    paths:
+      - '444.zip'
+      - '.github/workflows/main.yml'
+
 permissions:
   contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Extract updated game project
+
+      - name: Check archive
         run: |
           set -e
-          ZIP_FILE="maga-v-gorode-project.zip"
-          if [ ! -f "$ZIP_FILE" ]; then
-            echo "Upload maga-v-gorode-project.zip to the repository root first"
+          test -f 444.zip || { echo "ERROR: 444.zip not found in repository root"; exit 1; }
+          unzip -t 444.zip
+
+      - name: Extract project
+        run: |
+          set -e
+          mkdir -p extracted
+          unzip -q 444.zip -d extracted
+          if [ -f extracted/maga-v-gorode/app/build.gradle ]; then
+            echo "PROJECT_DIR=extracted/maga-v-gorode" >> "$GITHUB_ENV"
+          elif [ -f extracted/app/build.gradle ]; then
+            echo "PROJECT_DIR=extracted" >> "$GITHUB_ENV"
+          else
+            echo "ERROR: app/build.gradle not found inside 444.zip"
+            find extracted -maxdepth 5 -name build.gradle -print
             exit 1
           fi
-          rm -rf maga-v-gorode
-          unzip -q "$ZIP_FILE" -d .
-          test -f maga-v-gorode/app/build.gradle
-      - name: Build APKs
+
+      - name: Build debug APK
         run: |
           set -e
-          cd maga-v-gorode
-          gradle --no-daemon assembleDebug assembleRelease
+          cd "$PROJECT_DIR"
+          gradle --no-daemon assembleDebug
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/output/Maga-v-gorode-debug.apk"
-          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/output/Maga-v-gorode-release.apk"
-      - uses: actions/upload-artifact@v4
+          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/output/444.apk"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          name: Maga-v-gorode-APKs
-          path: output/*.apk
+          name: 444-APK
+          path: output/444.apk
           if-no-files-found: error
           retention-days: 30
