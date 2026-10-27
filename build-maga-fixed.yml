@@ -1,0 +1,77 @@
+
+name: Build Maga v Gorode Fixed APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - '444-fixed.zip'
+      - '.github/workflows/build-maga-fixed.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Check archive
+        run: |
+          test -f 444-fixed.zip || {
+            echo "ERROR: 444-fixed.zip not found in repository root"
+            exit 1
+          }
+
+      - name: Extract project
+        run: |
+          mkdir extracted
+          unzip -q 444-fixed.zip -d extracted
+
+          if [ -f extracted/maga-v-gorode/app/build.gradle ]; then
+            echo "PROJECT_DIR=extracted/maga-v-gorode" >> "$GITHUB_ENV"
+          elif [ -f extracted/app/build.gradle ]; then
+            echo "PROJECT_DIR=extracted" >> "$GITHUB_ENV"
+          else
+            echo "ERROR: Android project not found in archive"
+            find extracted -maxdepth 4 -type f | head -100
+            exit 1
+          fi
+
+      - name: Build debug APK
+        run: |
+          cd "$PROJECT_DIR"
+          gradle --no-daemon assembleDebug
+
+      - name: Prepare APK
+        run: |
+          mkdir -p output
+          APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
+
+          test -f "$APK" || {
+            echo "ERROR: APK was not generated"
+            exit 1
+          }
+
+          cp "$APK" output/Maga-v-gorode.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Maga-v-gorode-APK
+          path: output/Maga-v-gorode.apk
+          if-no-files-found: error
