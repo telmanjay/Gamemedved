@@ -1,0 +1,45 @@
+
+name: Build Maga v Gorode APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'Maga-v-gorode-GAME-PROJECT.zip'
+      - '.github/workflows/build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Extract project
+        run: |
+          unzip -q Maga-v-gorode-GAME-PROJECT.zip
+          test -f maga-v-gorode/app/build.gradle
+
+      - name: Build APK
+        run: |
+          gradle -p maga-v-gorode --no-daemon assembleDebug assembleRelease
+          mkdir -p output
+          cp maga-v-gorode/app/build/outputs/apk/debug/app-debug.apk output/Maga-v-gorode-debug.apk
+          cp maga-v-gorode/app/build/outputs/apk/release/app-release.apk output/Maga-v-gorode-release.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Maga-v-gorode-APKs
+          path: output/*.apk
+          if-no-files-found: error
